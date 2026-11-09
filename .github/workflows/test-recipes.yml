@@ -20,6 +20,8 @@ on:
       - 'recipes/**'
       - 'mods/fix-qwen3-next-autoround/**'
       - 'mods/memory-profile/**'
+      - 'mods/fix-dspark-dsv4-d2t/**'
+      - 'mods/add-dsv4-topk256/**'
       - 'tests/**'
       - '.github/workflows/test-recipes.yml'
   pull_request:
@@ -40,6 +42,8 @@ on:
       - 'recipes/**'
       - 'mods/fix-qwen3-next-autoround/**'
       - 'mods/memory-profile/**'
+      - 'mods/fix-dspark-dsv4-d2t/**'
+      - 'mods/add-dsv4-topk256/**'
       - 'tests/**'
       - '.github/workflows/test-recipes.yml'
   workflow_dispatch:
@@ -95,6 +99,9 @@ jobs:
       run: |
         python3 tests/test_memory_profile_mod.py
         python3 tests/test_memory_capacity.py
+
+    - name: Test DSpark DSV4 mods
+      run: bash tests/test_dspark_dsv4_mods.sh
 
     - name: Run recipe integration tests
       run: |

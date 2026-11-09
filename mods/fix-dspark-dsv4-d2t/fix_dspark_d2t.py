@@ -30,12 +30,15 @@ Idempotency
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
+# VLLM_PACKAGE_ROOT overrides the vllm package location for offline tests;
+# the default matches the runner image's dist-packages layout.
 DSPARK_PATH = Path(
-    "/usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/nvidia/dspark.py"
-)
+    os.environ.get("VLLM_PACKAGE_ROOT", "/usr/local/lib/python3.12/dist-packages/vllm")
+) / "models/deepseek_v4/nvidia/dspark.py"
 CLASS_NAME = "DSparkDeepseekV4ForCausalLM"
 ATTR_NAME = "draft_id_to_target_id"
 ATTR_VALUE = "None"

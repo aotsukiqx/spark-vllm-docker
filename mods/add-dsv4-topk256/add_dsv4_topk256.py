@@ -50,13 +50,18 @@ Idempotency
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
 
+# FLASHINFER_PACKAGE_ROOT overrides the flashinfer package location for
+# offline mocks; the default matches the flashinfer layout of the runner image.
 FLASHINFER_SPARSE_MLA = Path(
-    "/usr/local/lib/python3.12/dist-packages/flashinfer/mla/_sparse_mla_sm120.py"
-)
+    os.environ.get(
+        "FLASHINFER_PACKAGE_ROOT", "/usr/local/lib/python3.12/dist-packages/flashinfer"
+    )
+) / "mla/_sparse_mla_sm120.py"
 DISPATCH_TABLE_NAME = "_DECODE_DSV4_DISPATCH"
 NUM_HEADS = (8, 16, 32, 64, 128)
 TOPK_VALUE = 256
@@ -107,7 +112,7 @@ def extend_dispatch_table(text: str) -> tuple[str, int]:
     # Find the closing brace.
     close_idx: int | None = None
     for j in range(open_idx, len(lines)):
-        if lines[j].strip() == "}":
+        if lines[j].strip() in ("}", "})"):
             close_idx = j
             break
     if close_idx is None:

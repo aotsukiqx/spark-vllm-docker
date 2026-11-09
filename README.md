@@ -2412,6 +2412,8 @@ The repository includes several pre-configured mods in the `mods/` directory:
 - **fix-qwen3-coder-next/**: Qwen3-Coder-Next runtime and performance fixes.
 - **radixark-dspark/**: Routes Qwen DSpark checkpoints such as `RadixArk/Qwen3.8-27B-DSpark` to vLLM's Qwen3 DSpark loader instead of the DeepSeek-V4 loader.
 - **dspark-instanttensor/**: Filters embedded `mtp.*` DSpark draft weights before InstantTensor or safetensors I/O, preventing a second full-checkpoint load.
+- **fix-dspark-dsv4-d2t/**: Adds `draft_id_to_target_id = None` to vLLM's `DSparkDeepseekV4ForCausalLM` so `DSparkSpeculator.load_draft_model` no longer raises `AttributeError` when serving DeepSeek-V4-Flash with DSpark speculative decoding (vLLM PR #47429). No-op on vLLM builds without the DSpark-V4 model.
+- **add-dsv4-topk256/**: Extends FlashInfer's SM120 DSV4 decode dispatch with `(num_heads, 256)` entries and raises an actionable `ValueError` for unsupported decode shapes, enabling DeepSeek-V4-Flash DSpark draft decode with topk=256 (Python side of FlashInfer PR #3817). The matching C++ kernels require rebuilding FlashInfer with `--apply-flashinfer-pr 3817`.
 - **gpu-mem-util-gb/**: Adds experimental `--gpu-memory-utilization-gb` support.
 - **kv-cache-prealloc-cleanup/**: Applies model-specific manual KV-cache startup tweaks: skip CUDA graph profiling when disabled by env and allow `--gpu-memory-utilization-gb` with `--kv-cache-memory-bytes`.
 - **[memory-profile/](mods/memory-profile/README.md)**: Records per-model startup CPU/CUDA/KV measurements for every rank, API process and host, with JSONL traces, YAML profile cards, a cluster collector, Markdown reports with startup charts, and a read-only hardware requirements/cluster capacity checker.
