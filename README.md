@@ -338,6 +338,16 @@ for additional launcher options.
 
 ## CHANGELOG
 
+### 2026-11-10
+
+#### DeepSeek V4 Flash DSpark recipe (topk=256 draft decode)
+
+Added the cluster-only `deepseek-v4-flash-dspark` recipe for serving `deepseek-ai/DeepSeek-V4-Flash` on a dual DGX Spark cluster with DSpark speculative decoding on the standard (non-B12X) FlashInfer stack. It applies `mods/fix-dspark-dsv4-d2t` (vLLM PR #47429) and `mods/add-dsv4-topk256` (Python side of FlashInfer PR #3817) and builds FlashInfer with `--apply-flashinfer-pr 3817` so the topk=256 draft decode kernels are compiled in.
+
+```bash
+./run-recipe.sh deepseek-v4-flash-dspark
+```
+
 ### 2026-10-16
 
 'glm-5.3-flash` recipe now uses a new FP4-Local checkpoint from NVIDIA, replacing an older version hosted in local-inference-lab repository. As with Qwen, this checkpoint features compressed scales and is QAD quantized. Up to 2M KV cache on dual Sparks!
