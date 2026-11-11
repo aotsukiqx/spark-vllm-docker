@@ -897,7 +897,7 @@ RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     if [ -n "$PINNED_TORCHAUDIO" ]; then echo "torchaudio==${PINNED_TORCHAUDIO}" >> /tmp/torch-override.txt; fi && \
     echo "nvidia-cutlass-dsl[cu13]==${CUTLASS_DSL_VERSION}" >> /tmp/torch-override.txt && \
     echo "fastapi[standard]>=0.115.0,<0.137.0" >> /tmp/torch-override.txt && \
-    uv pip install ray[default] fastsafetensors instanttensor \
+    uv pip install ray[default] fastsafetensors instanttensor==0.1.9 \
         --override /tmp/torch-override.txt
 
 # B12X is supplied by FlashInfer, including its CuTe cache-integrity fix.
