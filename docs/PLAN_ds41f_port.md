@@ -13,6 +13,9 @@
 集群侧工件：`~/nvmodels/window-1011/`（launch-1017.sh / launch-1017-phase1.sh / bench_16.py），
 停机前日志 `~/nvmodels/logs-window-1011/`，回滚点 tag `pre-ds41f-port`（集群仓库 6430ce1）。
 
+⚠️ 窗口收尾必做：head node 上 `systemctl --user start dsv41-watchdog.service`（产线自愈守护，
+窗口内已临时 stop——首次停机后它 09:15 自动拉回了 sglang，二次停机前已停用）。
+
 
 状态基线：2026-11-11。本文件是团队基线文档，每个 phase 收口后更新状态。
 
