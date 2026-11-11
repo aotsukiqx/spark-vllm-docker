@@ -701,7 +701,7 @@ usage() {
     echo "  --nccl-ref <ref>              : NCCL commit SHA, branch or tag (default: pinned commit in Dockerfile)"
     echo "  --b12x-vllm-ref <ref>          : B12X vLLM fork commit SHA, branch or tag (default: dev/karmic-kraken; pin a SHA for reproducible A/B)"
     echo "  --ext-src-dir <dir>            : Pre-fetched vLLM external sources (cutlass/, deepselect/, ...); skips all remaining GitHub FetchContent"
-    echo "  --triton-kernels-src-dir <dir> : Local triton_kernels python package dir (skips vLLM's GitHub FetchContent)"
+    echo "  --triton-kernels-src-dir <dir> : Dir containing the triton_kernels/ package folder (skips vLLM's GitHub FetchContent)"
     echo "  --torch-version <version>     : PyTorch version for build and runner images (default: '${DEFAULT_TORCH_VERSION}')"
     echo "  --torchvision-version <ver>   : Optional torchvision version (default: '${TORCHVISION_VERSION}')"
     echo "  --torchaudio-version <ver>    : Optional torchaudio version; use 'none' to omit it (default: '${TORCHAUDIO_VERSION}')"
