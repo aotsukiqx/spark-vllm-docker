@@ -13,6 +13,11 @@ ARG CUTLASS_DSL_VERSION=4.7.0
 # stage with --build-context vllm_source=/path/to/checkout.
 FROM scratch AS vllm_source
 
+# Empty fallback; override with --build-context triton_kernels_source=<dir>
+# whose content is the triton_kernels python package. Feeds
+# TRITON_KERNELS_SRC_DIR so vLLM's FetchContent skips the GitHub clone.
+FROM scratch AS triton_kernels_source
+
 # =========================================================
 # STAGE 1: Base Build Image
 # =========================================================
@@ -313,6 +318,8 @@ ARG VLLM_SOURCE_COMMIT=""
 # Empty overrides select DeepGEMM to match the patched vLLM source below.
 ARG DEEPGEMM_REPO=""
 ARG DEEPGEMM_REF=""
+# 1 = use the triton_kernels_source build context instead of the GitHub fetch.
+ARG TRITON_KERNELS_LOCAL=0
 ENV DEEPGEMM_SRC_DIR=/workspace/DeepGEMM
 
 # The upstream repository uses the shared checkout cache. Custom repositories
@@ -714,6 +721,8 @@ RUN --mount=type=cache,id=ccache,target=/root/.ccache \
     --mount=type=cache,id=cargo-registry,target=/opt/cargo/registry \
     --mount=type=cache,id=cargo-git,target=/opt/cargo/git \
     --mount=type=cache,id=vllm-rust-target,target=/workspace/vllm/vllm/target \
+    --mount=type=bind,from=triton_kernels_source,target=/tmp/triton-kernels-src \
+    if [ "$TRITON_KERNELS_LOCAL" = "1" ]; then export TRITON_KERNELS_SRC_DIR=/tmp/triton-kernels-src/triton_kernels; fi; \
     VLLM_REQUIRE_RUST_FRONTEND=1 CARGO_BUILD_JOBS=${MAX_JOBS} \
     uv build --no-build-isolation --wheel . --out-dir=/workspace/wheels -v
 
