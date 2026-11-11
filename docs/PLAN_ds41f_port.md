@@ -1,5 +1,19 @@
 # spark-ds41f 优化移植 · 开发计划
 
+## 窗口进行中（2026-11-11）
+
+生产 sglang 集群（spark-eb1a, 4x DGX Spark）已按规程停产（worker 日志留存 → stop → drain 45s → 4 节点 0 容器）。
+窗口 A+B 连续执行中：
+
+1. Build #1 pin 基线镜像进行中（`--exp-b12x --b12x-vllm-ref 8244d1c4 --rebuild-vllm -t vllm-node-b12x-pin-base`）
+2. 待：Build #2 同参重建 → Phase 0 commit 一致性验收
+3. 待：1017 首次 vLLM 启动（本地模型路径 `/models/DeepSeek-V4.1-Flash-1017`，476G，不下载不分发）
+4. 待：16 流 A/B（Arm A 控制 vs Arm B +Phase 1 env，2 rounds each）
+
+集群侧工件：`~/nvmodels/window-1011/`（launch-1017.sh / launch-1017-phase1.sh / bench_16.py），
+停机前日志 `~/nvmodels/logs-window-1011/`，回滚点 tag `pre-ds41f-port`（集群仓库 6430ce1）。
+
+
 状态基线：2026-11-11。本文件是团队基线文档，每个 phase 收口后更新状态。
 
 ## 目标
