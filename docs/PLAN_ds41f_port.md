@@ -65,10 +65,35 @@ wheel 构建已写 `.vllm-commit`/`.flashinfer-commit` provenance 标记并进�
 - malloc/usage-stats 三项已落入两个 dsv4.1 recipe `env:` 段（recipe → `container_env` → `-e` 链路现成）。
 - cpuset 无需开发：`launch-cluster.sh:15` 已有 `VLLM_SPARK_EXTRA_DOCKER_ARGS` 注入
   （`VLLM_SPARK_EXTRA_DOCKER_ARGS="--cpuset-cpus=5-9,15-19" ./launch-cluster.sh …`），此前无文档。
-- 待做：host `vm.watermark_boost_factor=0`（setup-cluster.py 可逆项 + doctor 检查）、
-  launcher 测试断言（cpuset flag 生成的回归测试）、16 流 A/B bench。
+- 待做：host `vm.watermark_boost_factor=0`（defer：需集群窗口 A/B 验证后再决定是否扩
+  doctor 检查面，避免为未验证 sysctl 固化代码）、16 流 A/B bench（需集群）。
+- 已补：launcher 回归测试 `VLLM_SPARK_EXTRA_DOCKER_ARGS` 注入断言
+  （`tests/test_launch_cluster_image_sync.sh`，提交 1206895，顺带修复 bash3.2 空数组
+  pre-existing 阻塞——套件从死在第 2 测试提升到过 9/19）。
 
-状态：**部分落地（env 三项 + cpuset 通道确认），host sysctl 与 A/B 验证待做**。
+状态：**代码项全部落地（env 四项 + cpuset 通道 + 回归测试），集群侧 A/B 与 sysctl 决策待做**。
+
+### Gate 评审（2026-11-11，PlanGate 子代理裁决摘录）
+
+两个改变排期的技术事实：
+1. dsv4.1 产线（`--exp-b12x`）vLLM 无 commit pin：`EXP_B12X_VLLM_REF` 浮动分支硬编码，
+   且与 `--vllm-ref` 互斥（`build-and-copy.sh:37,885`）。Phase 0 的"`--vllm-ref` 已够"仅对默认 main 道成立。
+2. Phase 3 补丁承载改判：走 runner `--installed` 安装树补丁层（`Dockerfile:876-890` 模式，
+   只重建 runner、复用缓存 wheel），不走 regular series（series 要重编 b12x wheel 且对非 main ref 跳过）。
+
+裁决要点：Phase 0 基线构建先行（不并入 Phase 2，需未打补丁控制镜像）；Phase 1 立即收口 +
+16 流 A/B（免构建）；Phase 2 soak 提前编排但与 bench 互斥；0002-0004 switchless ring 移出
+（改浮点求和顺序污染判据）；Phase 4 砍尾版 defer 至 Phase 3 收口（可复现性收益非吞吐）；
+Phase 5 gate 改写为：①dsv41 全 sha pin 有构建证据 ②Phase 2 已裁决 ③接口探针
+（`all_reduce_max_bytes` + 205 阈值 TP4 重算）通过；Phase 4 从 gate 剔除。
+
+已按裁决落地（本日）：
+- `--b12x-vllm-ref <sha>` 覆盖（`build-and-copy.sh`）+ 3x/4x dsv4.1 recipe build_args 全 sha pin
+  （`8244d1c4`，dev/karmic-kraken 2026-11-11 HEAD）
+- `build-metadata.yaml` 的 `nccl_ref` 字段默认值现从 Dockerfile ARG 解析（不再是字面 "default"）
+- `--nccl-ref`/`--b12x-vllm-ref`/默认 pin 三个回归测试（`tests/test_build_and_copy.sh`），
+  顺带修复 mock docker 两处 bash3.2 空数组 unbound-variable（套件从死在第 5 测试解锁到 27+ 连过）
+
 
 ## Phase 2 — NCCL patch（3-5 天）
 

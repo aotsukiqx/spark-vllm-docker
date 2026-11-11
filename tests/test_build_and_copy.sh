@@ -134,7 +134,7 @@ if [ "${1:-}" = "build" ]; then
                                 fi
                             fi
                             write_wheel_metadata "$dest/flashinfer_jit_cache-built.whl" \
-                                flashinfer-jit-cache 0.7.0 "${requirements[@]}"
+                                flashinfer-jit-cache 0.7.0 ${requirements[@]+"${requirements[@]}"}
                         fi
                         if [ -n "${MOCK_FLASHINFER_UNEXPECTED_WHEEL:-}" ]; then
                             write_wheel_metadata "$dest/${MOCK_FLASHINFER_UNEXPECTED_WHEEL//-/_}-built.whl" \
@@ -524,7 +524,7 @@ create_flashinfer_release() {
         requirements=('flashinfer-jit-cache-sm121a==0.7.0')
     fi
     write_wheel_metadata "$RELEASE_DIR/flashinfer_jit_cache-0.7.0-cp39-abi3-manylinux_2_28_aarch64.whl" \
-        flashinfer-jit-cache 0.7.0 "${requirements[@]}"
+        flashinfer-jit-cache 0.7.0 ${requirements[@]+"${requirements[@]}"}
     if [ "$1" = complete ]; then
         write_wheel_metadata "$RELEASE_DIR/flashinfer_jit_cache_sm121a-0.7.0-cp39-abi3-manylinux_2_28_aarch64.whl" \
             flashinfer-jit-cache-sm121a 0.7.0
@@ -1114,6 +1114,30 @@ test_exp_b12x_rebuild_vllm_uses_preset_source_build() {
     pass "--exp-b12x --rebuild-vllm uses the B12X source-build profile"
 }
 
+test_nccl_ref_passes_build_arg() {
+    setup_fixture
+    run_build --gpu-arch 12.0f --nccl-ref 1111111111111111111111111111111111111111 ||
+        fail "--nccl-ref run failed"
+    assert_log_contains 'docker build .*--build-arg NCCL_REF=1111111111111111111111111111111111111111'
+    pass "--nccl-ref passes NCCL_REF build-arg"
+}
+
+test_nccl_ref_defaults_to_dockerfile_pin() {
+    setup_fixture
+    run_build --gpu-arch 12.0f || fail "default NCCL ref run failed"
+    assert_log_not_contains 'docker build .*--build-arg NCCL_REF='
+    pass "default NCCL ref stays on the Dockerfile ARG pin (no override build-arg)"
+}
+
+test_b12x_vllm_ref_override_pins_source() {
+    setup_fixture
+    run_build --exp-b12x --rebuild-vllm --b12x-vllm-ref 2222222222222222222222222222222222222222 ||
+        fail "--b12x-vllm-ref run failed"
+    assert_output_contains 'Using B12X vLLM ref override: 2222222222222222222222222222222222222222'
+    assert_log_contains 'docker build .*--build-arg VLLM_REF=2222222222222222222222222222222222222222 '
+    assert_log_not_contains '--build-arg VLLM_REF=dev/karmic-kraken'
+    pass "--b12x-vllm-ref pins the B12X vLLM source for reproducible builds"
+}
 test_exp_b12x_allows_vllm_prs() {
     setup_fixture
     run_build --exp-b12x --apply-vllm-pr 12345 || fail "--exp-b12x with vLLM PR run failed"
@@ -2082,6 +2106,9 @@ test_local_vllm_source_rejects_conflicting_repo
 test_local_vllm_source_rejects_dirty_checkout
 test_local_vllm_source_rejects_missing_ref
 test_exp_b12x_uses_prebuilt_image
+test_nccl_ref_passes_build_arg
+test_nccl_ref_defaults_to_dockerfile_pin
+test_b12x_vllm_ref_override_pins_source
 test_exp_b12x_rebuild_vllm_uses_preset_source_build
 test_exp_b12x_allows_vllm_prs
 test_b12x_flashinfer_cache_is_independent

@@ -9,6 +9,7 @@ container: vllm-node-b12x
 
 build_args:
   - --exp-b12x
+  - --b12x-vllm-ref 8244d1c44348ae8a5bbfc9f1b607021652283ed4
 
 cluster_only: true
 

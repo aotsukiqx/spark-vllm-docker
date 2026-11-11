@@ -41,6 +41,9 @@ EXP_B12X_FLASHINFER_REF="9873d7a33f91aeb14c83286552e1f3d84efa2c2e"
 EXP_B12X_TORCH_VERSION="2.13.0"
 EXP_B12X_TORCHVISION_VERSION="0.28.0"
 EXP_B12X_TORCHAUDIO_VERSION="2.11.0"
+# Optional commit pin for the B12X vLLM fork; --b12x-vllm-ref overrides the
+# floating dev branch default for reproducible A/B baselines.
+B12X_VLLM_REF_OVERRIDE=""
 # Pinned by default in the Dockerfile; --nccl-ref overrides (SHA recommended).
 NCCL_REF=""
 FLASHINFER_REPO="https://github.com/flashinfer-ai/flashinfer.git"
@@ -123,7 +126,10 @@ generate_build_metadata() {
     local cutlass_dsl_version="${15}"
     local flashinfer_build_cubin="${16:-1}"
     local flashinfer_build_jit_cache="${17:-1}"
-    local nccl_ref="${18:-default}"
+    local nccl_ref="${18:-}"
+    if [ -z "$nccl_ref" ] || [ "$nccl_ref" = "default" ]; then
+        nccl_ref=$(grep -m1 '^ARG NCCL_REF=' "$dockerfile" | cut -d= -f2-)
+    fi
 
     local base_image
     base_image=$(grep -m1 '^FROM .* AS runner' "$dockerfile" | awk '{print $2}')
@@ -691,6 +697,7 @@ usage() {
     echo "  --vllm-source-dir <path>      : Build vLLM from a clean local Git checkout; incompatible with --vllm-repo"
     echo "  --vllm-ref <ref>              : vLLM commit SHA, branch or tag (default: 'main'; local source defaults to HEAD)"
     echo "  --nccl-ref <ref>              : NCCL commit SHA, branch or tag (default: pinned commit in Dockerfile)"
+    echo "  --b12x-vllm-ref <ref>          : B12X vLLM fork commit SHA, branch or tag (default: dev/karmic-kraken; pin a SHA for reproducible A/B)"
     echo "  --torch-version <version>     : PyTorch version for build and runner images (default: '${DEFAULT_TORCH_VERSION}')"
     echo "  --torchvision-version <ver>   : Optional torchvision version (default: '${TORCHVISION_VERSION}')"
     echo "  --torchaudio-version <ver>    : Optional torchaudio version; use 'none' to omit it (default: '${TORCHAUDIO_VERSION}')"
@@ -764,6 +771,15 @@ while [[ "$#" -gt 0 ]]; do
                 shift
             else
                 echo "Error: --vllm-source-dir requires a path."
+                exit 1
+            fi
+            ;;
+        --b12x-vllm-ref)
+            if [ -n "$2" ] && [[ "$2" != -* ]]; then
+                B12X_VLLM_REF_OVERRIDE="$2"
+                shift
+            else
+                echo "Error: --b12x-vllm-ref requires a commit SHA, branch, or tag."
                 exit 1
             fi
             ;;
@@ -891,6 +907,10 @@ if [ "$EXP_B12X" = true ]; then
 
     VLLM_REPO="$EXP_B12X_VLLM_REPO"
     VLLM_REF="$EXP_B12X_VLLM_REF"
+    if [ -n "$B12X_VLLM_REF_OVERRIDE" ]; then
+        VLLM_REF="$B12X_VLLM_REF_OVERRIDE"
+        echo "Using B12X vLLM ref override: $VLLM_REF"
+    fi
     TORCH_VERSION="$EXP_B12X_TORCH_VERSION"
     TORCHVISION_VERSION="$EXP_B12X_TORCHVISION_VERSION"
     TORCHAUDIO_VERSION="$EXP_B12X_TORCHAUDIO_VERSION"
