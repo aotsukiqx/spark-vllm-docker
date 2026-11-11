@@ -18,6 +18,12 @@ FROM scratch AS vllm_source
 # TRITON_KERNELS_SRC_DIR so vLLM's FetchContent skips the GitHub clone.
 FROM scratch AS triton_kernels_source
 
+# Empty fallback; override with --build-context vllm_extsrc=<dir> holding
+# pre-fetched external project sources (cutlass/, deepselect/, ...). The
+# Final Compilation step exports the matching *_SRC_DIR vars to skip every
+# remaining GitHub FetchContent.
+FROM scratch AS vllm_extsrc
+
 # =========================================================
 # STAGE 1: Base Build Image
 # =========================================================
@@ -321,6 +327,8 @@ ARG DEEPGEMM_REF=""
 # 1 = use the triton_kernels_source build context instead of the GitHub fetch.
 ARG TRITON_KERNELS_LOCAL=0
 ENV DEEPGEMM_SRC_DIR=/workspace/DeepGEMM
+# 1 = use the vllm_extsrc build context for all remaining GitHub FetchContent.
+ARG EXT_SRC_LOCAL=0
 
 # The upstream repository uses the shared checkout cache. Custom repositories
 # are cloned outside it so a fork can never reuse or mutate the upstream clone.
@@ -722,7 +730,18 @@ RUN --mount=type=cache,id=ccache,target=/root/.ccache \
     --mount=type=cache,id=cargo-git,target=/opt/cargo/git \
     --mount=type=cache,id=vllm-rust-target,target=/workspace/vllm/vllm/target \
     --mount=type=bind,from=triton_kernels_source,target=/tmp/triton-kernels-src \
+    --mount=type=bind,from=vllm_extsrc,target=/tmp/vllm-extsrc \
     if [ "$TRITON_KERNELS_LOCAL" = "1" ]; then export TRITON_KERNELS_SRC_DIR=/tmp/triton-kernels-src/triton_kernels; fi; \
+    if [ "$EXT_SRC_LOCAL" = "1" ]; then \
+        export VLLM_CUTLASS_SRC_DIR=/tmp/vllm-extsrc/cutlass; \
+        export DEEPSELECT_SRC_DIR=/tmp/vllm-extsrc/deepselect; \
+        export FLASH_KDA_SRC_DIR=/tmp/vllm-extsrc/flashkda; \
+        export FLASH_MLA_SRC_DIR=/tmp/vllm-extsrc/flashmla; \
+        export FMHA_SM100_SRC_DIR=/tmp/vllm-extsrc/fmha_sm100; \
+        export QUTLASS_SRC_DIR=/tmp/vllm-extsrc/qutlass; \
+        export TML_FA4_SRC_DIR=/tmp/vllm-extsrc/tml_fa4; \
+        export VLLM_FLASH_ATTN_SRC_DIR=/tmp/vllm-extsrc/vllm_flash_attn; \
+    fi; \
     VLLM_REQUIRE_RUST_FRONTEND=1 CARGO_BUILD_JOBS=${MAX_JOBS} \
     uv build --no-build-isolation --wheel . --out-dir=/workspace/wheels -v
 

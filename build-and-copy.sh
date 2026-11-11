@@ -45,6 +45,7 @@ EXP_B12X_TORCHAUDIO_VERSION="2.11.0"
 # floating dev branch default for reproducible A/B baselines.
 B12X_VLLM_REF_OVERRIDE=""
 TRITON_KERNELS_SRC_DIR=""
+VLLM_EXT_SRC_DIR=""
 # Pinned by default in the Dockerfile; --nccl-ref overrides (SHA recommended).
 NCCL_REF=""
 FLASHINFER_REPO="https://github.com/flashinfer-ai/flashinfer.git"
@@ -699,6 +700,7 @@ usage() {
     echo "  --vllm-ref <ref>              : vLLM commit SHA, branch or tag (default: 'main'; local source defaults to HEAD)"
     echo "  --nccl-ref <ref>              : NCCL commit SHA, branch or tag (default: pinned commit in Dockerfile)"
     echo "  --b12x-vllm-ref <ref>          : B12X vLLM fork commit SHA, branch or tag (default: dev/karmic-kraken; pin a SHA for reproducible A/B)"
+    echo "  --ext-src-dir <dir>            : Pre-fetched vLLM external sources (cutlass/, deepselect/, ...); skips all remaining GitHub FetchContent"
     echo "  --triton-kernels-src-dir <dir> : Local triton_kernels python package dir (skips vLLM's GitHub FetchContent)"
     echo "  --torch-version <version>     : PyTorch version for build and runner images (default: '${DEFAULT_TORCH_VERSION}')"
     echo "  --torchvision-version <ver>   : Optional torchvision version (default: '${TORCHVISION_VERSION}')"
@@ -791,6 +793,15 @@ while [[ "$#" -gt 0 ]]; do
                 shift
             else
                 echo "Error: --triton-kernels-src-dir requires a directory containing the triton_kernels package."
+                exit 1
+            fi
+            ;;
+        --ext-src-dir)
+            if [ -n "$2" ] && [[ "$2" != -* ]]; then
+                VLLM_EXT_SRC_DIR="$2"
+                shift
+            else
+                echo "Error: --ext-src-dir requires a directory of pre-fetched external sources (cutlass/, deepselect/, ...)."
                 exit 1
             fi
             ;;
@@ -1461,6 +1472,11 @@ if [ "$NO_BUILD" = false ]; then
             if [ -n "$TRITON_KERNELS_SRC_DIR" ]; then
                 VLLM_CMD+=("--build-context" "triton_kernels_source=$TRITON_KERNELS_SRC_DIR")
                 VLLM_CMD+=("--build-arg" "TRITON_KERNELS_LOCAL=1")
+            fi
+
+            if [ -n "$VLLM_EXT_SRC_DIR" ]; then
+                VLLM_CMD+=("--build-context" "vllm_extsrc=$VLLM_EXT_SRC_DIR")
+                VLLM_CMD+=("--build-arg" "EXT_SRC_LOCAL=1")
             fi
 
             if [ "$APPLY_PRESET_VLLM_PRS" = true ]; then
