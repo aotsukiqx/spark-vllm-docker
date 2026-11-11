@@ -897,7 +897,9 @@ if [ "$EXP_B12X" = true ]; then
     if [ "$EXP_MXFP4" = true ]; then echo "Error: --exp-b12x is incompatible with --exp-mxfp4"; exit 1; fi
     if [ "$USE_WHEELS" = true ]; then echo "Error: --exp-b12x is incompatible with --use-wheels because B12X vLLM wheels are not published"; exit 1; fi
     if [ "$VLLM_REPO_SET" = true ]; then echo "Error: --exp-b12x is incompatible with --vllm-repo"; exit 1; fi
-    if [ "$VLLM_SOURCE_DIR_SET" = true ]; then echo "Error: --exp-b12x is incompatible with --vllm-source-dir"; exit 1; fi
+    if [ "$VLLM_SOURCE_DIR_SET" = true ]; then
+        echo "Note: --exp-b12x with --vllm-source-dir uses the local checkout (b12x preset keeps Torch/FlashInfer settings; the local commit wins over any ref)."
+    fi
     if [ "$VLLM_REF_SET" = true ]; then echo "Error: --exp-b12x is incompatible with --vllm-ref"; exit 1; fi
     if [ "$TORCH_VERSION_SET" = true ]; then echo "Error: --exp-b12x is incompatible with --torch-version"; exit 1; fi
     if [ "$TORCHVISION_VERSION_SET" = true ]; then echo "Error: --exp-b12x is incompatible with --torchvision-version"; exit 1; fi
