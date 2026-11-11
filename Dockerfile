@@ -114,7 +114,7 @@ RUN git clone https://github.com/NVIDIA/nccl.git && \
     cd nccl && git checkout --detach $NCCL_REF && \
     make -j ${BUILD_JOBS} src.build NVCC_GENCODE="${NCCL_NVCC_GENCODE}" && \
     make pkg.debian.build && apt install -y --no-install-recommends --allow-downgrades --allow-change-held-packages ./build/pkg/deb/*.deb && \
-    git -C nccl rev-parse HEAD > /workspace/nccl-commit.txt
+    git rev-parse HEAD > /workspace/nccl-commit.txt
 
 # =========================================================
 # STAGE 2: FlashInfer Builder
