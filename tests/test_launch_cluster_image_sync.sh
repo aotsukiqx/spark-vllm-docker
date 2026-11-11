@@ -228,7 +228,7 @@ test_unlimited_memlock_on_every_node() {
         setup_fixture
         mode_args=()
         [[ "$mode" == privileged ]] || mode_args=(--non-privileged)
-        run_launch "${mode_args[@]}" || fail "$mode launch failed"
+        run_launch ${mode_args[@]+"${mode_args[@]}"} || fail "$mode launch failed"
         assert_log_contains '^docker run .*--ulimit memlock=-1:-1 '
         assert_log_contains '^ssh .*docker run .*--ulimit memlock=-1:-1 '
     done
@@ -469,6 +469,15 @@ test_signal_stops_supervisor_and_clients() {
     pass "SIGTERM terminates supervision, reaps clients and cleans up owned containers"
 }
 
+test_extra_docker_args_env_injects_docker_flags() {
+    setup_fixture
+    VLLM_SPARK_EXTRA_DOCKER_ARGS="--cpuset-cpus=5-9,15-19 --cpu-shares=512" run_launch ||
+        fail "launch failed with VLLM_SPARK_EXTRA_DOCKER_ARGS"
+    assert_log_contains '^docker run .*--cpuset-cpus=5-9,15-19'
+    assert_log_contains '^docker run .*--cpu-shares=512'
+    pass "VLLM_SPARK_EXTRA_DOCKER_ARGS injects docker run flags"
+}
+test_extra_docker_args_env_injects_docker_flags
 test_matching_images_launch_cluster
 test_unlimited_memlock_on_every_node
 test_mismatched_image_aborts_before_launch
