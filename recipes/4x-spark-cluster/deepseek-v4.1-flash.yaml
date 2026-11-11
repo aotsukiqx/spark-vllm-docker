@@ -31,7 +31,11 @@ env:
   VLLM_USE_V2_MODEL_RUNNER: "1"
   VLLM_USE_BREAKABLE_CUDAGRAPH: "1"
   VLLM_MXFP8_LM_HEAD: "1"
-
+  # Host-side overhead tuning from spark-ds41f (Phase 1).
+  MALLOC_ARENA_MAX: "2"
+  MALLOC_MMAP_THRESHOLD_: "1048576"
+  VLLM_NO_USAGE_STATS: "1"
+  DO_NOT_TRACK: "1"
 command: |
   vllm serve deepseek-ai/DeepSeek-V4.1-Flash \
       --host {host} \

@@ -41,6 +41,8 @@ EXP_B12X_FLASHINFER_REF="9873d7a33f91aeb14c83286552e1f3d84efa2c2e"
 EXP_B12X_TORCH_VERSION="2.13.0"
 EXP_B12X_TORCHVISION_VERSION="0.28.0"
 EXP_B12X_TORCHAUDIO_VERSION="2.11.0"
+# Pinned by default in the Dockerfile; --nccl-ref overrides (SHA recommended).
+NCCL_REF=""
 FLASHINFER_REPO="https://github.com/flashinfer-ai/flashinfer.git"
 FLASHINFER_BUILD_CUBIN=1
 FLASHINFER_BUILD_JIT_CACHE=1
@@ -121,6 +123,7 @@ generate_build_metadata() {
     local cutlass_dsl_version="${15}"
     local flashinfer_build_cubin="${16:-1}"
     local flashinfer_build_jit_cache="${17:-1}"
+    local nccl_ref="${18:-default}"
 
     local base_image
     base_image=$(grep -m1 '^FROM .* AS runner' "$dockerfile" | awk '{print $2}')
@@ -131,6 +134,7 @@ build_script_commit: $(git rev-parse HEAD 2>/dev/null || echo "unknown")
 vllm_version: ${vllm_version:-unknown}
 vllm_commit: ${vllm_commit:-unknown}
 flashinfer_commit: ${flashinfer_commit:-unknown}
+nccl_ref: ${nccl_ref}
 gpu_arch: ${GPU_ARCH_LIST}
 base_image: ${base_image:-unknown}
 build_args:
@@ -686,6 +690,7 @@ usage() {
     echo "  --vllm-repo <url>             : vLLM Git repository (default: '${DEFAULT_VLLM_REPO}'); custom repositories bypass the shared checkout cache"
     echo "  --vllm-source-dir <path>      : Build vLLM from a clean local Git checkout; incompatible with --vllm-repo"
     echo "  --vllm-ref <ref>              : vLLM commit SHA, branch or tag (default: 'main'; local source defaults to HEAD)"
+    echo "  --nccl-ref <ref>              : NCCL commit SHA, branch or tag (default: pinned commit in Dockerfile)"
     echo "  --torch-version <version>     : PyTorch version for build and runner images (default: '${DEFAULT_TORCH_VERSION}')"
     echo "  --torchvision-version <ver>   : Optional torchvision version (default: '${TORCHVISION_VERSION}')"
     echo "  --torchaudio-version <ver>    : Optional torchaudio version; use 'none' to omit it (default: '${TORCHAUDIO_VERSION}')"
@@ -759,6 +764,15 @@ while [[ "$#" -gt 0 ]]; do
                 shift
             else
                 echo "Error: --vllm-source-dir requires a path."
+                exit 1
+            fi
+            ;;
+        --nccl-ref)
+            if [ -n "$2" ] && [[ "$2" != -* ]]; then
+                NCCL_REF="$2"
+                shift
+            else
+                echo "Error: --nccl-ref requires a commit SHA, branch, or tag."
                 exit 1
             fi
             ;;
@@ -1182,6 +1196,9 @@ fi
 COMMON_BUILD_FLAGS+=("--build-arg" "BUILD_JOBS=$BUILD_JOBS")
 COMMON_BUILD_FLAGS+=("--build-arg" "TORCH_CUDA_ARCH_LIST=$GPU_ARCH_LIST")
 COMMON_BUILD_FLAGS+=("--build-arg" "FLASHINFER_CUDA_ARCH_LIST=$GPU_ARCH_LIST")
+if [ -n "$NCCL_REF" ]; then
+    COMMON_BUILD_FLAGS+=("--build-arg" "NCCL_REF=$NCCL_REF")
+fi
 if [ "$EXP_MXFP4" = false ]; then
     COMMON_BUILD_FLAGS+=("--build-arg" "TORCH_VERSION=$TORCH_VERSION")
     COMMON_BUILD_FLAGS+=("--build-arg" "TORCHVISION_VERSION=$TORCHVISION_VERSION")
@@ -1232,7 +1249,8 @@ if [ "$NO_BUILD" = false ]; then
         MXFP4_FLASHINFER_REPO=$(grep -m1 '^ARG FLASHINFER_REPO=' Dockerfile.mxfp4 | cut -d= -f2-)
         generate_build_metadata Dockerfile.mxfp4 "unknown" "$MXFP4_VLLM_SHA" "$MXFP4_FLASHINFER_SHA" \
             "mxfp4-pinned" "false" "true" "" "$MXFP4_VLLM_REPO" "base-image" \
-            "base-image" "base-image" "$MXFP4_FLASHINFER_REPO" "$MXFP4_FLASHINFER_SHA" "base-image"
+            "base-image" "base-image" "$MXFP4_FLASHINFER_REPO" "$MXFP4_FLASHINFER_SHA" "base-image" \
+            "not-applicable"
 
         CMD=("docker" "build" "-t" "$IMAGE_TAG" "${COMMON_BUILD_FLAGS[@]}" "-f" "Dockerfile.mxfp4" ".")
         echo "Building image with command: ${CMD[*]}"
@@ -1471,7 +1489,8 @@ if [ "$NO_BUILD" = false ]; then
         generate_build_metadata Dockerfile "$VLLM_VERSION" "$VLLM_COMMIT" "$FLASHINFER_COMMIT" \
             "$VLLM_REF" "true" "false" "$VLLM_PRS" "$VLLM_REPO" "$TORCH_VERSION" \
             "${TORCHVISION_VERSION:-resolver-selected}" "${TORCHAUDIO_VERSION:-resolver-selected}" \
-            "$FLASHINFER_REPO" "$FLASHINFER_REF" "$CUTLASS_DSL_VERSION" "$FLASHINFER_BUILD_CUBIN" "$FLASHINFER_BUILD_JIT_CACHE"
+            "$FLASHINFER_REPO" "$FLASHINFER_REF" "$CUTLASS_DSL_VERSION" "$FLASHINFER_BUILD_CUBIN" "$FLASHINFER_BUILD_JIT_CACHE" \
+            "${NCCL_REF:-default}"
 
         RUNNER_CMD=("docker" "build"
             "-t" "$IMAGE_TAG"

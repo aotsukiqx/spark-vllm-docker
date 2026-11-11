@@ -98,6 +98,10 @@ ENV TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}
 ARG NCCL_NVCC_GENCODE
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 
+# Pin NCCL to a verified commit by default so identical build args reproduce
+# identical NCCL source. Pass --build-arg NCCL_REF=<sha|branch|tag> to move.
+ARG NCCL_REF=ad2d192c1f279aefcaf340f67e07880b65a1116b
+
 # Setup Workspace
 WORKDIR $VLLM_BASE_DIR
 
@@ -107,8 +111,10 @@ WORKDIR $VLLM_BASE_DIR
 #     make pkg.debian.build && apt install -y --no-install-recommends --allow-downgrades ./build/pkg/deb/*.deb
 
 RUN git clone https://github.com/NVIDIA/nccl.git && \
-    cd nccl && make -j ${BUILD_JOBS} src.build NVCC_GENCODE="${NCCL_NVCC_GENCODE}" && \
-    make pkg.debian.build && apt install -y --no-install-recommends --allow-downgrades --allow-change-held-packages ./build/pkg/deb/*.deb
+    cd nccl && git checkout --detach $NCCL_REF && \
+    make -j ${BUILD_JOBS} src.build NVCC_GENCODE="${NCCL_NVCC_GENCODE}" && \
+    make pkg.debian.build && apt install -y --no-install-recommends --allow-downgrades --allow-change-held-packages ./build/pkg/deb/*.deb && \
+    git -C nccl rev-parse HEAD > /workspace/nccl-commit.txt
 
 # =========================================================
 # STAGE 2: FlashInfer Builder
