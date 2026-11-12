@@ -1,0 +1,32 @@
+# Patch #1 收敛：单一根因 — verify 成本 ∝ rows（B12X 未批化）
+
+日期：2026-11-12 续。基于源码 + 实测 + cost 模型三点互证。
+
+## 机制链（全链打通）
+
+```
+adaptive_verification._assign_draft_token_budget
+  budget = argmax(expected_accepted_tokens / cost)
+  cost(rows) = draft_cost + base_verify + scale * (verify_cost(rows) - base_verify)
+                     ↑ verify_cost(rows) 来自 boot 实测曲线（build_cost_tables_from_curves）
+```
+
+- 硬上限排除：max_total_logits = 1GB/(vocab*4) ≈ 2076 rows >> 16 reqs
+- 实测深度 1.68/7 = utility 模型在**陡峭 verify 成本曲线**下的正确选择
+- 陡峭的来源：verify 成本 ∝ rows → B12X attention 对 (rows) 展开查询未批化（TPOT≈n×单元 实测印证）
+- 因此：**draft 深度小 与 并发串行化是同一根因**；批化修复后 adaptive 自动放深度，不改 adaptive 代码
+
+## 调优旋钮（不修代码的中间手段）
+
+`adaptive_verification_cost_scale < 1` 让模型低估 verify 边际成本 → 更大 budget。
+风险：若 verify 真慢（串行化未修），总吞吐未必提升——A/B 臂正在测（adaptive OFF 等价最激进）。
+
+## 验收线（不变）
+
+批化 patch 落地后：16 流 96 → ≥150（保底）/300+；深度应自然升至 ~4-5（4-gram 表能力上限）。
+
+## 落地入口（新会话/后续）
+
+- b12x 仓库：`b12x/attention/sparse_mla` + `paged_decode`（verify 的 rows 维批化）
+- vllm fork：`v1/worker/gpu/spec_decode/dspark/speculator.py` + `dflash2/`（query 展开与 batch 契约）
+- 对照：pico `engine/dspark`（单趟批内 draft+verify）

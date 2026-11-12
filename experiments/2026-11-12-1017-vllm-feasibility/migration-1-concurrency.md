@@ -76,7 +76,21 @@ patch #1 第一步变为：找出压低 draft 深度的决策点（`adaptive_ver
 | draft 深度 1.68/7 | /metrics 直读 | `engine/engram_prefetch.py`：hash-id 前向起点即算出（~1ms GPU 窗口），side-stream O_DIRECT 预取，gather 发起时已在缓存（~200µs） | 在 b12x/vllm 的 disk engram gather 前加预取层（CUDA graph 兼容：native callback 不调 CUDA API） |
 | verify 串行化 | TPOT≈n×单元 | `engine/dspark` 批内共享 draft+verify 单趟 | b12x/attention/sparse_mla + paged_decode 的批维度 |
 
-验收：单流 20→≥60（深度 1.68→≥4）；16 流 96→≥150（保底）/300+（目标）。
+
+## 源码复审修正（2026-11-12 续：patch #1 开工首日）
+
+读 `vllm/models/deepseek_v4_1/common/engram.py` + `nvidia/model_state.py` 后修正蓝图前提：
+
+1. **预取层已存在且编排正确**：`model_state.py:259` 在 prepare_inputs 阶段调
+   `prepare_disk_engram`（hash 早算 → 批量 `stage_disk` → gathers 先入队 → CUDA graph
+   侧流查）——与 pico 同构。**"补预取"不再是 patch 目标**。
+2. **表能力上限**：`engram_max_ngram_size=4` → draft 深度理论上限 ~5（4+bonus）；
+   我们配置 k=7 超出表能力（超配无害但说明 k 非瓶颈）。
+3. **`lookback_depth=3` 硬编码**（engram.py:172）——4-gram 表的键长惯例 n-1=3，
+   需对照 pico 的键长确认是否完整。
+4. **语料因子假设（测试中）**：pico 441@16 是 copies 场景（重复 prompt，n-gram 命中
+   天然高）；pico 自家 chat 90 vs code 144（1.6x 语料敏感）。我们 1.68 深度若在高自
+   重复 code/json 语料下显著抬升 → 真实实现差距收窄，patch 重心转向 verify 批化。
 
 ## 数据文件
 
