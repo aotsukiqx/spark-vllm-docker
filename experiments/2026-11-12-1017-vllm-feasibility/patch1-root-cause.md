@@ -52,3 +52,10 @@ adaptive_verification._assign_draft_token_budget
 **结论：adaptive 非瓶颈而是功臣（cost 模型正确）。剩余差距 100% 在 verify 批化**——
 batch 化降低 rows 成本后 adaptive 自动加深度，两头同受益。
 **no-adaptive 路径作废**，生产配置回到 aligned（adaptive ON）。
+
+## 第三候选（测试中）：CUDA graph capture 尺寸
+
+官方公式 `max_cudagraph_capture_size = MAX_NUM_SEQS × (k+1)`：官方 4×8=32。
+我们沿用旧值 **48**，而 16 请求 × 8 = **128** → verify 掉出 full graph 走 piecewise
+（no-adaptive 臂 TPOT 340ms 的部分来源）。已建 graph128 臂：capture 128 +
+官方桶列表（1..8 逐个 + 8..128 步长 4）→ A/B 中。
