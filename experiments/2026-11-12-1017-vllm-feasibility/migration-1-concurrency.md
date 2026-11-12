@@ -25,10 +25,16 @@ TPOT ≈ n × 21ms 线性劣化；吞吐饱和 ~44 tok/s。对照 pico：16 流 
 
 pico `engine/dspark`：C++ 层单步处理整批请求的 draft+verify（每步 59ms @16 流，批内共享 CUDA graph 与通信）。vLLM fork 的 `vllm/v1/spec_decode/dflash.py` proposer 有 batch 维度（`batch_size * num_query_per_req`），断裂点需在 verify/调度侧定位（`vllm/v1/core/sched/` + `v1/worker/` 的 spec 路径）。
 
-## 下一步（源码定位 → patch 或上游证据）
+## 源码定位线索（2026-11-12，下个工作单元起点）
 
-1. 定位 verify 侧批处理：`vllm/v1/` 下 DSpark/DFlash verify 的 batch 维度执行 vs 逐请求循环
-2. 若 fork 逐请求循环 → mod/patch 批化（验收线：16 流聚合 44 → ≥150 tok/s，TPOT ≤100ms）
+- `vllm/v1/worker/gpu_model_runner.py:696`：drafter 构建仅按 `use_dflash()` 分 `DFlashProposer`；
+  **gmr.py 无 use_dspark 独立分支**（grep 零命中）——DSpark 经 eagle/dflash 家族路径进入
+- `vllm/config/speculative.py:2039-2099`：`use_eagle()` 含 dspark；dflash 与 dspark 在
+  KV 语义上分家（`use_eagle_preserves_target_kv_cache`），但 drafter 层共享
+- `vllm/v1/spec_decode/dflash.py`：proposer 有 batch 维度（`batch_size * num_query_per_req`）
+- 追踪链：`gpu_model_runner` step → drafter.propose（batch?）→ target forward（verify batch?）
+  → `speculative.py: num_speculative_tokens_per_batch_size`（动态 spec 配置，adaptive 窗口）
+  ——重点查 verify 的 target forward 是否 per-request 循环
 3. 若架构性限制（spec verify 与 continuous batching 冲突）→ 按"可量化上游证据"升级
 
 ## 数据文件
