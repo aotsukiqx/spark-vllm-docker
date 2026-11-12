@@ -55,6 +55,8 @@ command: |
       --linear-backend b12x \
       --moe-backend b12x \
       --attention-backend b12x \
+      --max-cudagraph-capture-size 128 \
+      --compilation-config '{{"cudagraph_mode":"FULL_AND_PIECEWISE","custom_ops":["all"],"cudagraph_capture_sizes":[1,2,3,4,5,6,7,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128]}}' \
       --speculative-config '{{"method":"dspark","num_speculative_tokens":{num_speculative_tokens},"draft_tensor_parallel_size":{tensor_parallel},"attention_backend":"B12X","draft_sample_method":"probabilistic","rejection_sample_method":"standard","enable_adaptive_verification":true}}' \
       --reasoning-parser deepseek_v41 \
       --tool-call-parser deepseek_v41 \
