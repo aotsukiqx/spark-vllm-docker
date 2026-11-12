@@ -50,7 +50,14 @@ target 单趟 forward（DFlash/DSpark 的 bonus-token + K masked queries 设计�
 **DSpark verify 的入口嫌疑：`sparse_mla`（1017 的 decode 走 sparse-MLA，即 topk256 mod
 所修路径）与 `paged_decode`（decode 侧 paged attention）**。patch #1 新会话从这两个
 模块的 forward 读起，对照 vllm fork 侧 `dflash.py:build_model_inputs_first_pass`
-的 (batch×K+1) 展开如何进入 attention metadata。
+
+## 差距最终解剖（2026-11-12，真 temp0 确认）
+
+真 temperature=0 复测：单流 20.5（vs temp1.0 20.4）、16 流 95（vs 96）——**温度彻底无关**。
+每步 45ms（快于 pico 59ms）× accept ~1.4 tok（vs pico ~5.2）——**单流 4.4x 差距 = accept 率**。
+pico 的 accept≈满值源于 engram 表（16M 词表 n-gram 预测器）作为 draft 核心。
+**迁移 #1 双头目标**：draft 路径的 engram 利用（b12x sparse_mla gather 是否接入 dspark
+draft + adaptive verification 是否压低有效 k）+ verify 批化。两条线索收敛于同一模块。
 
 ## 数据文件
 
