@@ -39,10 +39,25 @@ switchless 有向环。** 本集群生产 = 交换机双链路（rocep1s0f1 + ro
 
 ---
 
-## 计划正文
+## 目标框架（用户裁定 2026-11-12，最高优先级）
 
-把参考项目（pico-dgx-ds4）验证过的优化思路移植到本仓库（spark-vllm-docker，vLLM 路线），
-保持工程纪律：每个 phase 独立 PR、A/B 同一镜像基线、双 repeat、报告保留 adverse rows。
+**以参考 repo（pico-dgx-ds4）的算法与思路分析 vLLM 框架，性能迁移为第一目标。**
+只有经分析确认"修改 vLLM 永远无法满足"的能力缺口，才作为问题上升级别（换引擎/混合架构），
+且必须给出量化证据。迁移开发与测试遵循：**可回滚（每步独立 patch + tag）+
+可量化验证（每项迁移先建基线，A/B 双臂，数据入 `experiments/<日期>-<主题>/`）**。
+
+### pico 优化清单 → vLLm 迁移映射（分析驱动，逐项量化）
+
+| pico 机制 | pico 实现 | vLLM 侧对应/差距 | 迁移状态 |
+|---|---|---|---|
+| Engram NVMe 分片 + 侧流预取 | 按秩分片 + O_DIRECT + hash-id 即预取（覆盖 1ms GPU 窗口） | `--engram-config table_memory=disk`（内建）；预取/分片粒度未知 | **boot 中**（nightly 镜像 800K）——先量化 gather 延迟与 IO 等待再谈优化 |
+| DSpark draft-verify | C++ 自实现，k=5，59ms/步 | vLLM fork 已有 dspark（topk256/d2t mod 已就位） | 待量化：accept rate、tokens/step vs pico 的数字 |
+| fast-load / 权重预切分 | .dsw 按秩 mmap | instanttensor（加载路径已通） | 待量化：boot 到 serve 时间 vs pico |
+| prefill 10k tok/s | 引擎级 | vLLM fork B12X 栈 | **待建基线**（pico 10k / sglang 5.3k / 我们 ?） |
+| 会话 spill（KV→NVMe） | SPILL 目录 | vLLM 无直接对应（KV 池内 pinned） | 观察项：800K/1M 时 KV 池压力 |
+| 交换机 fabric 优化 | （pico 是 ring，不适用） | 生产双链路 MERGE_NICS 已配 | NCCL #2393 fence 保留候选 |
+
+每项迁移的交付物：分析笔记（差距归因）→ patch/mod → A/B 数据 → go/no-go → 回滚点 tag。
 
 ## 前提结论（证据，2026-11-10 两侧仓库实测）
 
