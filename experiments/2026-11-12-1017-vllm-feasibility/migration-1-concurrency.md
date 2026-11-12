@@ -65,7 +65,18 @@ accept 率 76.5%（健康）、每步产出 ≈2.3 tok @45ms ≈ 22 tok/s 与实
 **靶心改写：单流差距的头号原因是 draft 深度被压到 1.68**（pico ~5）——嫌疑：
 adaptive verification 的动态 k 压缩决策，或 draft 侧 engram 查询限速。
 patch #1 第一步变为：找出压低 draft 深度的决策点（`adaptive_verification*` 实现，
-vllm fork spec_decode/dynamic/ 或 b12x preparation），对照 pico 的恒定 k=5 + 高深度。
+
+## Patch #1 最终蓝图（闭环）
+
+`num_speculative_tokens_per_batch_size` 未配置（dynamic schedule 未启用）→ 深度 1.68
+非调度压缩，而是 **disk 模式 engram n-gram 查询的自然深度**。两个差距源与 pico 机制一一对应：
+
+| 差距源 | 实测 | pico 机制（迁移蓝本） | patch 目标 |
+|---|---|---|---|
+| draft 深度 1.68/7 | /metrics 直读 | `engine/engram_prefetch.py`：hash-id 前向起点即算出（~1ms GPU 窗口），side-stream O_DIRECT 预取，gather 发起时已在缓存（~200µs） | 在 b12x/vllm 的 disk engram gather 前加预取层（CUDA graph 兼容：native callback 不调 CUDA API） |
+| verify 串行化 | TPOT≈n×单元 | `engine/dspark` 批内共享 draft+verify 单趟 | b12x/attention/sparse_mla + paged_decode 的批维度 |
+
+验收：单流 20→≥60（深度 1.68→≥4）；16 流 96→≥150（保底）/300+（目标）。
 
 ## 数据文件
 
