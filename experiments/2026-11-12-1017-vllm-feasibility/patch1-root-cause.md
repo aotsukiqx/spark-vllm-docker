@@ -40,3 +40,15 @@ adaptive_verification._assign_draft_token_budget
   → **单流差距主因是每步有效接受量 × 步频的乘积差**，其中我们 adaptive 只 draft 1.86
   而 pico 恒 draft 5——verify 5 行的成本被其 CUDA graph 摊平（批内一次 forward）
 - 待 no-adaptive 臂实测验证：关 adaptive 后深度/吞吐是否向 pico 形态收敛
+
+## 决定性 A/B（2026-11-12 18:30，同 code 语料，单变量）
+
+| 并发 | adaptive ON | adaptive OFF |
+|---:|---:|---:|
+| 1 | ~50-55 | 15.3 |
+| 16 | **71.6 / 75.9**（TPOT 192ms） | 42.7 / 42.9 / 42.4（TPOT 340ms） |
+
+**adaptive ON 反而 +76%**；OFF 臂 accept 率 42.9% 且 verify 成本吃满。
+**结论：adaptive 非瓶颈而是功臣（cost 模型正确）。剩余差距 100% 在 verify 批化**——
+batch 化降低 rows 成本后 adaptive 自动加深度，两头同受益。
+**no-adaptive 路径作废**，生产配置回到 aligned（adaptive ON）。
