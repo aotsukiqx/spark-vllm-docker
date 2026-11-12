@@ -1,28 +1,48 @@
 # spark-ds41f 优化移植 · 开发计划
 
-## 窗口进行中（2026-11-11）
+## ⚠️ 参考项目更正与方向声明（2026-11-12，权威）
 
-生产 sglang 集群（spark-eb1a, 4x DGX Spark）已按规程停产（worker 日志留存 → stop → drain 45s → 4 节点 0 容器）。
-窗口 A+B 连续执行中：
+**参考 repo 是 [Picom-code/pico-dgx-ds4](https://github.com/Picom-code/pico-dgx-ds4)**
+（fork of blaesus/dsgx10）——**不是** MiaAI-Lab 的 DeepSeek-v4.1-Flash-DGX-Sparks。
+后者是 sglang TP4 产线方案，在 pico 的 DESIGN.md 里明确列为 *baseline*；两者勿再混淆。
 
-1. Build #1 pin 基线镜像进行中（`--exp-b12x --b12x-vllm-ref 8244d1c4 --rebuild-vllm -t vllm-node-b12x-pin-base`）
-2. 待：Build #2 同参重建 → Phase 0 commit 一致性验收
-3. 待：1017 首次 vLLM 启动（本地模型路径 `/models/DeepSeek-V4.1-Flash-1017`，476G，不下载不分发）
-4. 待：16 流 A/B（Arm A 控制 vs Arm B +Phase 1 env，2 rounds each）
+| | 参考：pico-dgx-ds4 | baseline：MiaAI sglang kit | 本仓库（我们） |
+|---|---|---|---|
+| 引擎 | 自研 C++（dsgb10：engine/attn/comm/dspark/engram/kernels） | SGLang + adapter | vLLM fork（local-inference-lab）+ spark-vllm-docker |
+| 指标 | 单流 90/144（chat/code），16 用户 441 tok/s，prefill 10k，**1M ctx** | 87.7/124.8，4.9-5.9k prefill，1M ctx | 待测 |
+| engram | NVMe 按秩分片 + C 库 O_DIRECT + CUDA graph 内 IO | OFFLOAD_MODE=nvme + 预打包 | `--engram-config table_memory=disk` |
+| 配置方式 | 单文件 fleet.conf（KEY=value，C++/bash 双端解析） | .env profile → boot.py 组装 | recipe YAML → launch-cluster.sh |
 
-集群侧工件：`~/nvmodels/window-1011/`（launch-1017.sh / launch-1017-phase1.sh / bench_16.py），
-停机前日志 `~/nvmodels/logs-window-1011/`，回滚点 tag `pre-ds41f-port`（集群仓库 6430ce1）。
+**拓扑方向（用户裁定 2026-11-12）：面向 200G 交换机 fabric 优化，不移植 pico 的
+switchless 有向环。** 本集群生产 = 交换机双链路（rocep1s0f1 + roceP2p1s0f1，
+`NCCL_IB_MERGE_NICS=1`）；计划中原 Phase 2 的 switchless ring 移植项作废，
+仅保留与交换机拓扑无关的 NCCL 修复（#2393 acquire fence 等）。
 
-⚠️ 窗口收尾必做：head node 上 `systemctl --user start dsv41-watchdog.service`（产线自愈守护，
-窗口内已临时 stop——首次停机后它 09:15 自动拉回了 sglang，二次停机前已停用）。
+## 窗口状态（2026-11-12 更新）
 
+**Phase 0 已 PASS**（Build#1k 镜像 + Build#2 3 分钟全缓存复现 + vllm/nccl commit 一致）。
+受限网络构建全链打通（codeload 三件套 + 子模块填实 + FlashKDA 预补丁，沉淀 skill）。
 
-状态基线：2026-11-11。本文件是团队基线文档，每个 phase 收口后更新状态。
+**1017 部署因果链**（每层修复后暴露下一层）：
+1. 网络（10 轮）→ codeload 本地源三件套
+2. engram 默认 `table_memory='device'`（16M 词表 embedding 全上 GPU）→ `--engram-config '{"cpu_offload":false,"table_memory":"disk"}'` + `0.78` + `262144`（参考值）
+3. **instanttensor↔fork 版本耦合（两头堵）**：fork 8244d1c4（10-15，含 PR#1029 CSF block loader）需要配套 instanttensor；PyPI 0.1.9 缺 `has_csf_blocks`/`scale_expansion`，0.2.x 缺 weight_utils 的 8 项内部 API——配套版只存在于发布镜像内
+4. **解法（当前）**：eugr registry 有全 nightly 序列；`nightly-20261015` = fork HEAD 同日 CI 配套镜像（vllm+instanttensor+flashinfer 组合一致），正在拉取
 
-## 目标
+**当前目标**：nightly-20261015 镜像 + 双 dspark mod + engram disk + **800K ctx**（用户指定）boot 1017 → smoke → 16 流 A/B（Phase 1 host env）→ 收窗报告。
 
-把 spark-ds41f 仓库验证过的性能优化移植到本仓库（spark-vllm-docker），保持
-工程纪律：每个 phase 独立 PR、A/B 同一镜像基线、双 repeat、报告保留 adverse rows。
+窗口回滚点：集群仓库 tag `pre-ds41f-port`（6430ce1）；生产 = sglang canary-mig
+（回滚：`systemctl --user enable --now dsv41-watchdog.service` 自动拉起）。
+收尾必做：watchdog enable、`.env` 的 CONTAINER_NAME 残留清理评估、窗口产物归档 `experiments/`。
+
+集群侧工件：`~/nvmodels/window-1011/`（launch/bench/链式 pipeline + logs/ + experiments/）。
+
+---
+
+## 计划正文
+
+把参考项目（pico-dgx-ds4）验证过的优化思路移植到本仓库（spark-vllm-docker，vLLM 路线），
+保持工程纪律：每个 phase 独立 PR、A/B 同一镜像基线、双 repeat、报告保留 adverse rows。
 
 ## 前提结论（证据，2026-11-10 两侧仓库实测）
 
