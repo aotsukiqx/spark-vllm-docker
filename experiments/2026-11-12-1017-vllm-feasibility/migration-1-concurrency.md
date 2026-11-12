@@ -57,7 +57,15 @@ target 单趟 forward（DFlash/DSpark 的 bonus-token + K masked queries 设计�
 每步 45ms（快于 pico 59ms）× accept ~1.4 tok（vs pico ~5.2）——**单流 4.4x 差距 = accept 率**。
 pico 的 accept≈满值源于 engram 表（16M 词表 n-gram 预测器）作为 draft 核心。
 **迁移 #1 双头目标**：draft 路径的 engram 利用（b12x sparse_mla gather 是否接入 dspark
-draft + adaptive verification 是否压低有效 k）+ verify 批化。两条线索收敛于同一模块。
+
+## 实测修正（2026-11-12，/metrics 直读）
+
+`drafts=12688, draft_tokens=21349, accepted=16319` → **draft 深度 1.68/7（24%）**、
+accept 率 76.5%（健康）、每步产出 ≈2.3 tok @45ms ≈ 22 tok/s 与实测吻合。
+**靶心改写：单流差距的头号原因是 draft 深度被压到 1.68**（pico ~5）——嫌疑：
+adaptive verification 的动态 k 压缩决策，或 draft 侧 engram 查询限速。
+patch #1 第一步变为：找出压低 draft 深度的决策点（`adaptive_verification*` 实现，
+vllm fork spec_decode/dynamic/ 或 b12x preparation），对照 pico 的恒定 k=5 + 高深度。
 
 ## 数据文件
 
