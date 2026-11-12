@@ -59,3 +59,17 @@ batch 化降低 rows 成本后 adaptive 自动加深度，两头同受益。
 我们沿用旧值 **48**，而 16 请求 × 8 = **128** → verify 掉出 full graph 走 piecewise
 （no-adaptive 臂 TPOT 340ms 的部分来源）。已建 graph128 臂：capture 128 +
 官方桶列表（1..8 逐个 + 8..128 步长 4）→ A/B 中。
+
+**结果：无收益**（graph128 16 流 74.1/76.2 vs aligned 71.6/75.9，TPOT 持平）——
+vLLM 的 FULL_AND_PIECEWISE 已自适应选择小桶，capture 尺寸非瓶颈。**实验关闭**，
+但 recipes 保留官方公式值（与官方脚本一致、消除隐患）。
+
+## 配置层实验总账（三个全做完）
+
+| 实验 | 结果 | 判定 |
+|---|---|---|
+| 官方参数组 | +116%（44.5→96） | ✅ 固化进 recipes（commit 已有） |
+| adaptive OFF | −43% | ❌ adaptive 是功臣 |
+| capture 128 官方桶 | ±0% | ❌ 非瓶颈 |
+
+**结论：配置层收益已穷尽。剩余 4.6x 只在 verify 批化代码层。**
