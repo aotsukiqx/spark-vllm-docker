@@ -14,9 +14,9 @@ verdict.md    go/no-go + 回滚点 tag + adverse rows 保留
 
 | 指标（4x DGX Spark, TP4） | pico（C++ 引擎） | sglang baseline | 本仓库 vLLM |
 |---|---:|---:|---:|
-| decode chat 1 流 tok/s | 90.3 (mean 320 prompts) | 87.7 | **42.8**（median×3，256tok，含思维链，2026-11-12 首测） |
+| decode chat 1 流 tok/s | 90.3 | 87.7 | 42.8 → **20.4 对齐臂**（口径见注） |
 | decode code 1 流 tok/s | 144.0 | 124.8 | 待测 |
-| decode @16 用户 tok/s | 441 | 427 | **44.5/44.8**（2 rounds；TPOT p50 344ms、TTFT ~1s；**零并发扩展**：聚合≈单流） |
+| decode @16 用户 tok/s | 441 | 427 | 44.5 → **91.4/96.1 对齐臂**（TPOT 344→160ms，**参数对齐 +116%**） |
 | prefill tok/s | ~10k | 5.3k | 待测 |
 | max context | 1M | 1M | 800K（已 boot+smoke ✓，safetensors+engram disk） |
 | boot 到 serve | — | — | ~35min（safetensors 476G + AOT 1721 kernels） |
