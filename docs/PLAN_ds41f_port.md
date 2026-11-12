@@ -29,7 +29,25 @@ switchless 有向环。** 本集群生产 = 交换机双链路（rocep1s0f1 + ro
 3. **instanttensor↔fork 版本耦合（两头堵）**：fork 8244d1c4（10-15，含 PR#1029 CSF block loader）需要配套 instanttensor；PyPI 0.1.9 缺 `has_csf_blocks`/`scale_expansion`，0.2.x 缺 weight_utils 的 8 项内部 API——配套版只存在于发布镜像内
 4. **解法（当前）**：eugr registry 有全 nightly 序列；`nightly-20261015` = fork HEAD 同日 CI 配套镜像（vllm+instanttensor+flashinfer 组合一致），正在拉取
 
-**当前目标**：nightly-20261015 镜像 + 双 dspark mod + engram disk + **800K ctx**（用户指定）boot 1017 → smoke → 16 流 A/B（Phase 1 host env）→ 收窗报告。
+**已达成**（2026-11-12 17:00+）：1017 在 vLLM 上 boot+smoke ✓（nightly-20261015 + safetensors
++ engram disk + 800K）；性能基线 + 官方参数对齐（+116%）。
+
+**性能数据（当前最佳臂，实测）**：
+
+| 项 | 数值 | pico | sglang |
+|---|---:|---:|---:|
+| 单流（技术文本） | 20.5 tok/s | 90 | 87.7 |
+| 单流（code / json 语料） | 50-55 / 50-64 | 144（code） | 124.8（code） |
+| 16 流（技术文本 / code copies） | 96 / 72-76 | 441（copies） | 427 |
+| prefill 16K-64K | 4.6-5.4k tok/s | ~10k | 5.3k |
+| boot→serve | 14 min（AOT 缓存） | — | — |
+
+**根因收敛**（详见 `experiments/…/patch1-root-cause.md`）：adaptive verification 的
+draft 预算模型 + verify 成本 ∝ rows（B12X attention 未跨请求批化）——深度小与并发串行化
+是同一缺陷的两面。pico 对照：恒 k=5 每步 draft、期望接受 ~1.8/步（与我们 1.42 同量级），
+其速度来自 CUDA graph 摊平的批内 verify。
+
+**下一步**：no-adaptive 单变量 A/B（运行中）→ 判读 budget 模型 vs 代码差距 → 批化 patch。
 
 窗口回滚点：集群仓库 tag `pre-ds41f-port`（6430ce1）；生产 = sglang canary-mig
 （回滚：`systemctl --user enable --now dsv41-watchdog.service` 自动拉起）。
