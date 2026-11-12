@@ -51,7 +51,7 @@ command: |
       --max-num-seqs {max_num_seqs} \
       --max-num-batched-tokens {max_num_batched_tokens} \
       --limit-mm-per-prompt '{{"image":1}}' \
-      --engram-config '{{"cpu_offload":false,"table_memory":"disk"}}' \
+      --engram-config '{{"cpu_offload":false,"table_memory":"disk","disk_resident_scales":true}}' \
       --linear-backend b12x \
       --moe-backend b12x \
       --attention-backend b12x \
