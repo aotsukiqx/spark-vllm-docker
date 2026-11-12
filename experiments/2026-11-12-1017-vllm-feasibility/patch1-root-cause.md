@@ -73,3 +73,22 @@ vLLM 的 FULL_AND_PIECEWISE 已自适应选择小桶，capture 尺寸非瓶颈�
 | capture 128 官方桶 | ±0% | ❌ 非瓶颈 |
 
 **结论：配置层收益已穷尽。剩余 4.6x 只在 verify 批化代码层。**
+
+## ⚠️ 终审修正（2026-11-12 19:00）：批化并未缺失
+
+读 `vllm/v1/attention/backends/b12x.py` 后推翻“verify 未批化”假设：
+- `_verify_q_per_req = 1 + k`（478 行）——**verify 的 Q 行结构化建模已存在**
+- `paged_decode` 以 `max_q_per_req + max_batch` 计划（`_paged_decode_plans[(batch,page)]`）——
+  **单次调用服务整批**，非逐请求循环
+- 因此 rows 成本 = **128 行 × KV 长度 sparse-MLA + TP4 每步 104 collectives 的硬件
+  固有成本**，不是软件批化缺口
+
+**剩余差距的真实构成（最终）**：
+1. 硬件算术：每步 128 行（16×8）× 长 KV 的 sparse MLA（pico 同硬件但其 C++ 引擎与
+   CUDA graph 融合度更高：89 节点单图、PDL launch、25 collective/步 vs 我们 104）
+2. 通信：TP4 每步 104 collectives（pico 25）——**这是可优化但需改 vLLM 通信层结构**
+3. 深度：adaptive 在成本模型下正确保守（1.86），需先降每步成本
+
+**因此 patch #1 的正确定义已变化**：不是"补批化"，而是**降低每步通信/框架开销
+（104→减少 collectives）或提高 fusion 度**——接近 pico 的工程方向，但工作量与风险
+显著高于纯配置调整。这是**"vLLM 永远无法满足"判定的候选**（需进一步量化验证）。
