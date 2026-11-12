@@ -30,3 +30,13 @@ adaptive_verification._assign_draft_token_budget
 - b12x 仓库：`b12x/attention/sparse_mla` + `paged_decode`（verify 的 rows 维批化）
 - vllm fork：`v1/worker/gpu/spec_decode/dspark/speculator.py` + `dflash2/`（query 展开与 batch 契约）
 - 对照：pico `engine/dspark`（单趟批内 draft+verify）
+
+## pico dspark 实测参照（engine/dspark/README.md）
+
+- **固定 k=5 每步都 draft，无 adaptive**（89 节点单 CUDA graph 服务每步，PDL launch）
+- 参考 run（prose temp1）：深度恒 5，命中 1/2/3/4/5/6 tok 的步数分布 47/31/12/3/2/1
+  → **期望接受 ≈1.8 tok/步**（≈36%）——与我们 1.42 同量级！
+- 其单流 90-144 tok/s = 步长 59ms × 接受 1.8；我们 45ms/步 × 1.42
+  → **单流差距主因是每步有效接受量 × 步频的乘积差**，其中我们 adaptive 只 draft 1.86
+  而 pico 恒 draft 5——verify 5 行的成本被其 CUDA graph 摊平（批内一次 forward）
+- 待 no-adaptive 臂实测验证：关 adaptive 后深度/吞吐是否向 pico 形态收敛
