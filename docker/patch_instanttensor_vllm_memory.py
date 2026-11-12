@@ -87,6 +87,11 @@ def main() -> None:
         if len(locations) != 1:
             raise SystemExit("Unable to locate the installed InstantTensor package")
         target = Path(locations[0]) / "_impl.py"
+        if not target.exists():
+            # instanttensor >= 0.2.x restructured away _impl.py; the memory
+            # accounting patch does not apply to the new layout yet.
+            print("InstantTensor layout changed (no _impl.py); skipping memory patch")
+            return 0
     elif args.target is not None:
         target = args.target
     else:
