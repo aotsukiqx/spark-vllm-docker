@@ -35,7 +35,14 @@ pico `engine/dspark`：C++ 层单步处理整批请求的 draft+verify（每步 
 - 追踪链：`gpu_model_runner` step → drafter.propose（batch?）→ target forward（verify batch?）
   → `speculative.py: num_speculative_tokens_per_batch_size`（动态 spec 配置，adaptive 窗口）
   ——重点查 verify 的 target forward 是否 per-request 循环
-3. 若架构性限制（spec verify 与 continuous batching 冲突）→ 按"可量化上游证据"升级
+## 定位收窄（2026-11-12 终轮）
+
+drafter 分支链（gmr.py:650-697）确认 **DSpark 无独立 drafter**——draft+verify 内嵌
+target 单趟 forward（DFlash/DSpark 的 bonus-token + K masked queries 设计，
+`dflash.py:40 max_query_tokens = max_batch_size * (1+K)`）。串行化嫌疑最终收窄到：
+**B12X attention 层对 (n_req × (K+1)) 展开查询的处理**——B12X 源码在
+`local-inference-lab/b12x` 仓库（非 vllm fork），patch #1 从该 repo 的
+spec/verify 路径开始。**跨 repo 深挖，建议新会话接续本笔记。**
 
 ## 数据文件
 
