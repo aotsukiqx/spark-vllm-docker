@@ -49,6 +49,21 @@ draft 预算模型 + verify 成本 ∝ rows（B12X attention 未跨请求批化�
 
 **下一步**：no-adaptive 单变量 A/B（运行中）→ 判读 budget 模型 vs 代码差距 → 批化 patch。
 
+### 配置层实验终账（2026-11-12 19:00 全部完成）
+
+| 实验 | 结果 | 判定 |
+|---|---|---|
+| 官方 dspark 参数组（adaptive + greedy + k=7 + disk scales） | **+116%**（44.5→96 @16流；TPOT 344→160ms） | ✅ 固化进 recipes |
+| adaptive verification OFF | −43%（42.9 @16 流） | ❌ adaptive 是功臣 |
+| CUDA capture 128（官方公式 + 桶列表） | ±0% | ❌ 非瓶颈（保留配置一致性） |
+| 真 temp0 对照 | ±0% | 温度无关 |
+
+**终审修正**：verify 批化**早已存在**（`_verify_q_per_req = 1+k` +
+`paged_decode` 按 (batch,page) 计划单次调用整批）——“补批化”前提错误。
+剩余 4.6x = **每步硬件算术（128 行 × 长 KV sparse MLA）+ 每步 104 collectives
+（pico 25）**。降这一步需改 vLLM 通信/fusion 结构——按目标框架属
+“vLLM 永远无法满足”的**候选升级项**（附完整量化证据），不再是无脑 patch。
+
 窗口回滚点：集群仓库 tag `pre-ds41f-port`（6430ce1）；生产 = sglang canary-mig
 （回滚：`systemctl --user enable --now dsv41-watchdog.service` 自动拉起）。
 收尾必做：watchdog enable、`.env` 的 CONTAINER_NAME 残留清理评估、窗口产物归档 `experiments/`。
