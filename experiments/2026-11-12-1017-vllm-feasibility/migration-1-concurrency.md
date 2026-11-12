@@ -42,7 +42,15 @@ target 单趟 forward（DFlash/DSpark 的 bonus-token + K masked queries 设计�
 `dflash.py:40 max_query_tokens = max_batch_size * (1+K)`）。串行化嫌疑最终收窄到：
 **B12X attention 层对 (n_req × (K+1)) 展开查询的处理**——B12X 源码在
 `local-inference-lab/b12x` 仓库（非 vllm fork），patch #1 从该 repo 的
-spec/verify 路径开始。**跨 repo 深挖，建议新会话接续本笔记。**
+
+### b12x repo 侦察（2026-11-12 末轮）
+
+`local-inference-lab/b12x` 的 `b12x/attention/` 模块清单：`sparse_mla` / `compressed_sparse_mla`
+（CSF）/ `paged_decode` / `dsa_indexer` / `dense_mla` / `varlen` / `paged`。
+**DSpark verify 的入口嫌疑：`sparse_mla`（1017 的 decode 走 sparse-MLA，即 topk256 mod
+所修路径）与 `paged_decode`（decode 侧 paged attention）**。patch #1 新会话从这两个
+模块的 forward 读起，对照 vllm fork 侧 `dflash.py:build_model_inputs_first_pass`
+的 (batch×K+1) 展开如何进入 attention metadata。
 
 ## 数据文件
 
