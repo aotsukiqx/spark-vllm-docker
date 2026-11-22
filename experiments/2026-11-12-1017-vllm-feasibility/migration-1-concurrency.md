@@ -90,7 +90,19 @@ patch #1 第一步变为：找出压低 draft 深度的决策点（`adaptive_ver
    需对照 pico 的键长确认是否完整。
 4. **语料因子假设（测试中）**：pico 441@16 是 copies 场景（重复 prompt，n-gram 命中
    天然高）；pico 自家 chat 90 vs code 144（1.6x 语料敏感）。我们 1.68 深度若在高自
-   重复 code/json 语料下显著抬升 → 真实实现差距收窄，patch 重心转向 verify 批化。
+
+## copies 语料复测（2026-11-12 末次，对齐 pico 口径）
+
+code 语料 16 流（=pico 441 的 copies 口径）：**71.6/75.9 tok/s**（TPOT ~195ms）——
+**低于技术文本的 94-96，与 pico copies 红利方向相反**。判读：vLLM 在 draft 深度抬升后
+每步工作量增大，verify 串行化损失随之放大，且流间重复前缀未转化为收益。
+**patch #1 主矛盾确认收敛到 verify 批化**（draft 深度问题随语料自然缓解）。
+prefill 基线同步入表：16K→5410 / 32K→4645 / 64K→4755 tok/s（≈sglang 5.3k，距 pico 10k 差 2x）。
+
+## 窗口后记（2026-11-22）
+
+集群已于 11-21 被接管为 `spark-ds41f:a3-no-b12x-r5` 新产线（vLLM 0.29.1rc1.dev187），
+非本窗口镜像/配置；watchdog 仍 inactive。本档案基线数据属 nightly-20261015 组合。
 
 ## 数据文件
 
